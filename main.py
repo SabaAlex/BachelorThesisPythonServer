@@ -1,5 +1,6 @@
+from algorithm.ea.evolutionaryAlgorithm import EvolutionaryAlgorithm
 import numpy as np
-from algorithm.gnSolver import GNSolver
+from algorithm.regression.gnSolver import GNSolver
 
 COEFFICIENTS = [-0.001, 0.1, 0.1, 2.0, 15.0]
 
@@ -11,6 +12,12 @@ def gaussFunction(xValues : np.ndarray, coeff : list) -> np.ndarray:
         return new_array
     else:
         return xValues.dot(coeff)   
+
+def gauss_function(x : list):
+    sum_result = 0
+    for i in range(len(x)):
+        sum_result += coeff[i] * x[i]
+    return sum_result
 
 x = np.ones((10, 5))
 
@@ -29,5 +36,17 @@ print(solver.predict(np.array([1, 2, 1, 4, 1])))
 solver.fitNext()
 solver.fitNext()
 solver.fitNext()
+solver.fitNext()
+solver.fitNext()
+solver.fitNext()
+solver.fitNext()
 
 print(solver.predict(np.array([1, 2, 1, 4, 1])))
+
+coeff = solver.get_coefficients()
+
+x.shape[1]
+ea_algorithm = EvolutionaryAlgorithm(x.shape[1], 500, 0.2, x.shape[0], 2, gauss_function, 95, x, 4)
+
+fittest = ea_algorithm.runAlgorithm()
+print(fittest.get_list_of_variables())

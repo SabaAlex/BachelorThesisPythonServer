@@ -1,13 +1,13 @@
+from algorithm.ea.evolutionaryAlgorithm import EvolutionaryAlgorithm
 from flask import Flask
 from flask import request
 from flask_socketio import emit, SocketIO
-from algorithm.gnSolver import GNSolver
+from algorithm.regression.gnSolver import GNSolver
 import numpy as np
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.atomic_counter import FastReadCounter
-
 
 connection_counter = FastReadCounter()
 
@@ -80,7 +80,7 @@ def end_calibration():
 @app.route("/init")
 def init_gauss_newton_algorithm():
 
-    gauss_newton_coeff = [-0.001, 0.1, 0.1, 2, 15]
+    gauss_newton_coeff = [100, 0.1, 0.1, 2, 15]
     gauss_newton_coeff = np.array(gauss_newton_coeff)
 
     gauss_newton_algirithm = GNSolver(gaussFunction, gauss_newton_coeff, xValues, yValues, tolerance_difference=5)
@@ -101,15 +101,36 @@ def gaussFunction(xValues : np.ndarray, coeff : list):
     else:
         return xValues.dot(coeff)     
 
-
 #socket app
 @socketio.on("max variables", "/var")
-def get_max_coefficients():
-    emit()
+def get_max_variables(coeff):
+
+    def gauss_function(x : list):
+        sum_result = 0
+        for i in range(len(x)):
+            sum_result += coeff[i] * x[i]
+        return sum_result
+
+    ea_algorithm = EvolutionaryAlgorithm(xValues.shape[1], 500, 0.2, xValues.shape[0], 2, gauss_function, 95, xValues, 4)
+
+    fittest = ea_algorithm.runAlgorithm().get_list_of_variables()
+
+    emit("max variablex", {"data" : fittest})
 
 @socketio.on("min variables", "/var")
-def get_min_coefficients():
-    emit()
+def get_min_variabless(coeff):
+
+    def gauss_function(x : list):
+        sum_result = 0
+        for i in range(len(x)):
+            sum_result += coeff[i] * x[i]
+        return sum_result
+
+    ea_algorithm = EvolutionaryAlgorithm(xValues.shape[1], 500, 0.2, xValues.shape[0], 2, gauss_function, 20, xValues, 4)
+
+    fittest = ea_algorithm.runAlgorithm().get_list_of_variables()
+
+    emit("max variablex", {"data" : fittest})
 
 @socketio.on("get parameters","/param")
 def get_parameters(json):
