@@ -1,28 +1,42 @@
 from flask import Flask
 from flask import request
+from flask_socketio import emit, SocketIO
 from algorithm.gnSolver import GNSolver
 import numpy as np
-
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from apscheduler.schedulers.background import BackgroundScheduler
+from utils.atomic_counter import FastReadCounter
 
+
+connection_counter = FastReadCounter()
 
 gaussNewtonAlgirithm = None
 
-COEFFICIENTS = [-0.001, 0.1, 0.1, 2, 15]
-COEFFICIENTS = np.array(COEFFICIENTS)
-
 app = Flask(__name__)
+socketio = SocketIO(app)
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
 
 def compute_hr_mean_last_seconds():
-    pass
+    socketio.emit("get parameters", namespace="/param")
+    try:
+        result = sum(hrReadings) / len(hrReadings)
+        yValues.append(result)
+        hrReadings.clear()
+    except Exception:
+        pass
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=compute_hr_mean_last_seconds, trigger="interval", seconds=5)
-scheduler.start()
+
+xValues = []
+yValues = []
 
 hrReadings = []
-hrReadingsMeans = []
 
+#routes
 @app.route("/test")
 def testPage():
     return "Request Works"
@@ -32,8 +46,10 @@ def hrReadingFunction():
     user = request.form
     if("hrReading" in request.form.keys()):
         hrReading = user["hrReading"]
-        print(hrReading)
-        hrReadings.append(hrReading)
+
+        if connection_counter.get_count() != 0:
+            hrReadings.append(hrReading)
+
         response = app.response_class(
             response=f"Heart rate reading:{hrReading}",
             status=200
@@ -44,10 +60,37 @@ def hrReadingFunction():
             status=400
         )
     return response
-  
+
+@app.route("/start_calibration", methods=['GET'])
+def start_calibration():
+    scheduler.start()
+    return app.response_class(
+            response=f"Started Calibration",
+            status=200
+        )
+
+@app.route("/end_calibration", methods=['GET'])
+def end_calibration():
+    scheduler.shutdown()
+    return app.response_class(
+            response=f"Ended Calibration",
+            status=200
+        )
+
 @app.route("/init")
-def initGaussNewtonAlgorithm():
-    gaussNewtonAlgirithm = GNSolver()
+def init_gauss_newton_algorithm():
+
+    gauss_newton_coeff = [-0.001, 0.1, 0.1, 2, 15]
+    gauss_newton_coeff = np.array(gauss_newton_coeff)
+
+    gauss_newton_algirithm = GNSolver(gaussFunction, gauss_newton_coeff, xValues, yValues, tolerance_difference=5)
+
+    isFit, new_coeff = gauss_newton_algirithm.fitNext()
+    while not isFit:
+        isFit, new_coeff = gauss_newton_algirithm.fitNext()
+
+    emit("configured parameters", {"data" : new_coeff}, boradcast=True)
+    
 
 def gaussFunction(xValues : np.ndarray, coeff : list): 
     if(len(xValues.shape) != 1):
@@ -57,3 +100,30 @@ def gaussFunction(xValues : np.ndarray, coeff : list):
         return new_array
     else:
         return xValues.dot(coeff)     
+
+
+#socket app
+@socketio.on("max variables", "/var")
+def get_max_coefficients():
+    emit()
+
+@socketio.on("min variables", "/var")
+def get_min_coefficients():
+    emit()
+
+@socketio.on("get parameters","/param")
+def get_parameters(json):
+    xValues.append(json)
+
+@socketio.on('connect')
+def test_connect():
+    connection_counter.increment()
+    emit('connection response', {'data': 'Connected'})
+
+@socketio.on('disconnect')
+def test_disconnect():
+    connection_counter.decrement()
+    print('Client disconnected')
+
+if __name__ == '__main__':
+    socketio.run(app, "0.0.0.0", 8080)

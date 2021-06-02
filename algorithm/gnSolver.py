@@ -14,7 +14,7 @@ class GNSolver:
                 initial_values :  np.ndarray,
                 xValues : np.ndarray,
                 yValues : np.ndarray,
-                tolerance_difference : float = 10,
+                tolerance_difference : float = 5,
                 ):
 
         self.fit_function = fit_function
@@ -26,6 +26,9 @@ class GNSolver:
         self.yValues = yValues
     
         self.rmse = np.inf
+
+    def get_coefficients(self):
+        return self.coefficients
 
     def predict(self, x: np.ndarray):
         return self.fit_function(x, self.coefficients)
