@@ -1,3 +1,4 @@
+import functools
 from algorithm.ea.evolutionaryAlgorithm import EvolutionaryAlgorithm
 from flask import Flask
 from flask import request
@@ -8,10 +9,21 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.atomic_counter import FastReadCounter
+import logging
+
+logging.basicConfig(filename='myapp.log', level=logging.INFO)
+
+logger = logging.getLogger(__name__)
 
 connection_counter = FastReadCounter()
 
 gaussNewtonAlgirithm = None
+
+
+xValues = []
+yValues = []
+hrReadings = []
+
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -20,25 +32,26 @@ migrate = Migrate(app, db)
 
 
 def compute_hr_mean_last_seconds():
-    socketio.emit("get parameters", namespace="/param")
     try:
-        result = sum(hrReadings) / len(hrReadings)
-        yValues.append(result)
+        emit("get parameters")
+        yValues.append(functools.reduce(lambda a, b: (a * 0.75) + (b * 0.25), hrReadings))
         hrReadings.clear()
     except Exception:
         pass
 
+
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=compute_hr_mean_last_seconds, trigger="interval", seconds=5)
+scheduler.add_job(func=compute_hr_mean_last_seconds, trigger="interval", seconds = 5)
 
-xValues = []
-yValues = []
-
-hrReadings = []
 
 #routes
 @app.route("/test")
 def testPage():
+    logger.info("Loggint test run")
+    gauss_newton_coeff = [100, 0.1, 0.1, 2, 15]
+    gauss_newton_coeff = np.array(gauss_newton_coeff)
+    asd = GNSolver(gaussFunction, gauss_newton_coeff, np.array(xValues), np.array(yValues), tolerance_difference=5)
+    asd.log()
     return "Request Works"
 
 @app.route("/hrReading", methods=['POST'])
@@ -83,7 +96,7 @@ def init_gauss_newton_algorithm():
     gauss_newton_coeff = [100, 0.1, 0.1, 2, 15]
     gauss_newton_coeff = np.array(gauss_newton_coeff)
 
-    gauss_newton_algirithm = GNSolver(gaussFunction, gauss_newton_coeff, xValues, yValues, tolerance_difference=5)
+    gauss_newton_algirithm = GNSolver(gaussFunction, gauss_newton_coeff, np.array(xValues), np.array(yValues), tolerance_difference=5)
 
     isFit, new_coeff = gauss_newton_algirithm.fitNext()
     while not isFit:
@@ -101,8 +114,9 @@ def gaussFunction(xValues : np.ndarray, coeff : list):
     else:
         return xValues.dot(coeff)     
 
+
 #socket app
-@socketio.on("max variables", "/var")
+@socketio.on("get max variables", "/var")
 def get_max_variables(coeff):
 
     def gauss_function(x : list):
@@ -115,9 +129,9 @@ def get_max_variables(coeff):
 
     fittest = ea_algorithm.runAlgorithm().get_list_of_variables()
 
-    emit("max variablex", {"data" : fittest})
+    emit("set max variables", {"data" : fittest})
 
-@socketio.on("min variables", "/var")
+@socketio.on("get min variables", "/var")
 def get_min_variabless(coeff):
 
     def gauss_function(x : list):
@@ -130,20 +144,22 @@ def get_min_variabless(coeff):
 
     fittest = ea_algorithm.runAlgorithm().get_list_of_variables()
 
-    emit("max variablex", {"data" : fittest})
+    emit("set min variables", {"data" : fittest})
 
-@socketio.on("get parameters","/param")
-def get_parameters(json):
+@socketio.on("add parameters", "/param")
+def add_parameters(json):
     xValues.append(json)
 
 @socketio.on('connect')
 def test_connect():
     connection_counter.increment()
     emit('connection response', {'data': 'Connected'})
+    logger.info('Client connected')
 
 @socketio.on('disconnect')
 def test_disconnect():
     connection_counter.decrement()
+    logger.info('Client disconnected')
     print('Client disconnected')
 
 if __name__ == '__main__':

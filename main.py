@@ -1,8 +1,9 @@
+from random import random
 from algorithm.ea.evolutionaryAlgorithm import EvolutionaryAlgorithm
 import numpy as np
 from algorithm.regression.gnSolver import GNSolver
 
-COEFFICIENTS = [-0.001, 0.1, 0.1, 2.0, 15.0]
+COEFFICIENTS = [24, 51, 82, 41, 10]
 
 def gaussFunction(xValues : np.ndarray, coeff : list) -> np.ndarray: 
     if(len(xValues.shape) != 1):
@@ -19,7 +20,14 @@ def gauss_function(x : list):
         sum_result += coeff[i] * x[i]
     return sum_result
 
-x = np.ones((10, 5))
+xval = []
+for i in range(10):
+    yval = []
+    for j in range(5):
+        yval.append(random())
+    xval.append(yval)
+
+x = np.array(xval)
 
 y = gaussFunction(x, COEFFICIENTS)
 yn = y + 3 * np.random.randn(len(x))
@@ -27,21 +35,20 @@ yn = y + 3 * np.random.randn(len(x))
 print(x)
 print(yn)
 
-init_guess = 1000000 * np.random.random(len(COEFFICIENTS))
+init_guess = 100000 * np.random.random(len(COEFFICIENTS))
 
 solver = GNSolver(gaussFunction, init_guess, x, yn, 10 ** (-6))
 
-print(solver.predict(np.array([1, 2, 1, 4, 1])))
+print(solver.predict(np.array([0.45, 0.12, 0.87, 0.4, 0.213])))
 
-solver.fitNext()
-solver.fitNext()
-solver.fitNext()
-solver.fitNext()
-solver.fitNext()
-solver.fitNext()
-solver.fitNext()
+i = 0
+isFit, new_coeff = solver.fitNext()
+while not isFit:
+    i += 1
+    print(i)
+    isFit, new_coeff = solver.fitNext()
 
-print(solver.predict(np.array([1, 2, 1, 4, 1])))
+print(solver.predict(np.array([0.45, 0.12, 0.87, 0.4, 0.213])))
 
 coeff = solver.get_coefficients()
 
@@ -50,3 +57,4 @@ ea_algorithm = EvolutionaryAlgorithm(x.shape[1], 500, 0.2, x.shape[0], 2, gauss_
 
 fittest = ea_algorithm.runAlgorithm()
 print(fittest.get_list_of_variables())
+print(solver.predict(np.array(fittest.get_list_of_variables())))
