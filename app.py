@@ -1,6 +1,6 @@
 import functools
-from random import randint, random
-from tkinter import Radiobutton
+from random import randint
+import json as json_package
 from algorithm.ea.evolutionaryAlgorithm import EvolutionaryAlgorithm
 from flask import Flask
 from flask import request
@@ -22,9 +22,9 @@ connection_counter = FastReadCounter()
 
 gaussNewtonAlgirithm = None
 
-vo2MAX = 4453
+vo2MAX = 56.7
 
-hrMin = 52
+hrMin = 43
 
 hrReading_error = 0.05
 
@@ -101,7 +101,7 @@ def hrReadingFunction():
         hrReading = user["hrReading"]
 
         if connection_counter.get_count() != 0:
-            hrReadings.append(hrReading)
+            hrReadings.append(int(hrReading))
 
         response = app.response_class(
             response=f"Heart rate reading:{hrReading}",
@@ -168,8 +168,12 @@ def gaussFunction(xValues : np.ndarray, coeff : list):
 
 
 #socket app
-@socketio.on("get max variables", "/var")
-def get_max_variables(coeff):
+@socketio.on("get max variables")
+def get_max_variables(json):
+
+    data = json_package.loads(json)
+    values_list = data['data']
+    coeff = list(map(lambda element: int(element), values_list))
 
     def gauss_function(x : list):
         sum_result = 0
@@ -185,8 +189,12 @@ def get_max_variables(coeff):
 
     emit("set max variables", {"data" : fittest})
 
-@socketio.on("get min variables", "/var")
-def get_min_variabless(coeff):
+@socketio.on("get min variables")
+def get_min_variabless(json):
+
+    data = json_package.loads(json)
+    values_list = data['data']
+    coeff = list(map(lambda element: int(element), values_list))
 
     def gauss_function(x : list):
         sum_result = 0
@@ -202,9 +210,12 @@ def get_min_variabless(coeff):
 
     emit("set min variables", {"data" : fittest})
 
-@socketio.on("add parameters", "/param")
+@socketio.on("add parameters")
 def add_parameters(json):
-    xValues.append(json)
+    data = json_package.loads(json)
+    values_list = data['data']
+    int_values_list = list(map(lambda element: int(element), values_list))
+    xValues.append(int_values_list)
 
 @socketio.on('connect')
 def test_connect():
